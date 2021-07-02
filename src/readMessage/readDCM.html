@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="dropZone">
+    </div>
+    <input type="file" onchange="handleSelect(this)"><br />
+    <span>windowWidth</span>
+    <input type='range' id='valueWidth' min="-100" max="400" step="1" oninput="showValueW(this.value)"><br />
+    <span>windowCenter</span>
+    <input type='range' id='valueCenter' min="-100" max="400" value="10" step="1" oninput="showValueC(this.value)">
+    <div id=slider></div>
+    <canvas id="canvas" width="800" height="800"></canvas>
+</body>
+<script src="../../dicomParser.js"></script>
+<script>
+    window.dicomParser || document.write('<script src="https://unpkg.com/dicom-parser">\x3C/script>')
+</script>
+
+<!-- jquery - included to make things easier to demo, not needed by dicomParser -->
+<script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+<script>
+    var byteArray, ww, wc;
+
+    function parseByteArray(byteArray, ww, wc) {
+        //try {
+        var dataSet = dicomParser.parseDicom(byteArray);
+        var pixelDataElement = dataSet.elements.x7fe00010;
+        var rows = dataSet.uint16('x00280010'); //ROWS
+        var columns = dataSet.uint16('x00280011'); // COLUMNS
+        var intercept = parseInt(dataSet.string('x00281052'));
+        var slope = parseInt(dataSet.string('x00281053'));
+        var pixelRepresentation = dataSet.uint16('x00280103');
+        var windowCenter = wc || parseInt(dataSet.string('x00281050'));
+        var windowWidth = ww || parseInt(dataSet.string('x00281051'));
+        var count = rows * columns;
+        var minWin = (windowCenter - windowWidth / 2.0);
+        
+
+        var maxWin = (windowCenter + windowWidth / 2.0);
+        var Pixels = new Int16Array(dataSet.byteArray.buffer, pixelDataElement.dataOffset, pixelDataElement.length / 2);
+        var newPixels = new Uint8ClampedArray(count * 4);
+        for (var i = 0; i < count; i++) {
+            var j = i * 4;
+            // var num = Pixels[i];
+            var num = slope * Pixels[i] + intercept;
+            var val;
+            if (num <= minWin) {
+                val = 0;
+            } else if (num >= maxWin) {
+                val = 255;
+            } else {
+                val = Math.round((num - minWin) * 255 / (maxWin - minWin));
+            };
+            newPixels[j + 0] = val; // R value
+            newPixels[j + 1] = val; // G value
+            newPixels[j + 2] = val; // B value
+            newPixels[j + 3] = 255; // A value
+        }
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let imageData = new ImageData(newPixels, rows, columns);
+        console.log("imageData-----------------------------", imageData)
+        ctx.putImageData(imageData, 0, 0);
+        // } catch (err) {
+        //     $('#parseError').text(err);
+        // }
+        var ele1 = document.getElementById('valueWidth');
+        ele1.setAttribute.max = windowWidth;
+        ele1.setAttribute.max = windowCenter;
+        // console.log(ele1)
+    };
+
+    function showCanvas(pixelDataElement, Pixels, rows, columns, windowCenter, windowWidth, slope, intercept) {
+        var Pixels = new Int16Array(dataSet.byteArray.buffer, pixelDataElement.dataOffset, pixelDataElement.length / 2);
+        // console.log("Pixels==================>", Pixels)
+        var newPixels = new Uint8ClampedArray(count * 4);
+        var count = rows * columns;
+        var minWin = (windowCenter - windowWidth) / 2;
+        var maxWin = (windowCenter + windowWidth) / 2;
+        for (var i = 0; i < count; i++) {
+            var j = i * 4;
+            var num = slope * Pixels[i] + intercept;
+            var val;
+            if (num <= minWin) {
+                val = 0;
+            } else if (num >= maxWin) {
+                val = 255;
+            } else {
+                val = Math.round((num - minWin) * 255 / (maxWin - minWin));
+            }
+            newPixels[j + 0] = val; // R value
+            newPixels[j + 1] = val; // G value
+            newPixels[j + 2] = val; // B value
+            newPixels[j + 3] = 255; // A value
+        }
+        // console.log("newPixels===========================>", newPixels);
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let imageData = new ImageData(newPixels, rows, columns);
+        ctx.putImageData(imageData, 0, 0);
+    };
+
+    function loadFile(file) {
+        console.log(222);
+        var reader = new FileReader();
+        reader.onload = function (file) {
+            var arrayBuffer = reader.result;
+            byteArray = new Uint8Array(arrayBuffer);
+            parseByteArray(byteArray);
+            // var array_view = new Int16Array(arrayBuffer)
+            // array_view.forEach((element, index, array) => array[index] += 1000);
+            // console.log(arrayBuffer)
+        }
+        reader.readAsArrayBuffer(file);
+    };
+
+    function handleFileSelect(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+        var files = evt.dataTransfer.files;
+        console.log(files)
+        loadFile(files[0]);
+    };
+
+    function handleSelect(file) {
+        console.log(file.files)
+        loadFile(file.files[0])
+    };
+
+    function showValueW(newValue) {
+        ww = newValue;
+        console.log("wc=====>", wc)
+        console.log("ww=====>", ww)
+        parseByteArray(byteArray, wc, ww)
+        // document.getElementById('valueWidth').value=windowWidt
+    };
+
+    function showValueC(newValue) {
+        wc = newValue
+        console.log("wc=====>", wc)
+        console.log("ww=====>", ww)
+        parseByteArray(byteArray, ww, wc)
+    };
+</script>
+</script>
+
+</html>
